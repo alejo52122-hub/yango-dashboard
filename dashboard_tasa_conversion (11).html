@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Tasa de Conversión - Yango</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #f8fafc;
+    padding: 20px;
+    color: #1e293b;
+  }
+  h1 { font-size: 18px; margin-bottom: 4px; }
+  .subtitle { color: #64748b; font-size: 12px; margin-bottom: 20px; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+  }
+  .card {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 20px;
+  }
+  .card .ciudad {
+    font-size: 14px;
+    font-weight: 600;
+    color: #475569;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card .porcentaje {
+    font-size: 36px;
+    font-weight: 700;
+    color: #2563eb;
+    margin-bottom: 8px;
+  }
+  .card .detalle {
+    font-size: 13px;
+    color: #64748b;
+  }
+  .barra-bg {
+    background: #e2e8f0;
+    border-radius: 6px;
+    height: 8px;
+    overflow: hidden;
+    margin: 10px 0;
+  }
+  .barra-fill {
+    background: linear-gradient(90deg, #2563eb, #60a5fa);
+    height: 100%;
+    transition: width 0.5s ease;
+  }
+  .card.total {
+    background: #1e293b;
+    color: white;
+  }
+  .card.total .ciudad { color: #cbd5e1; }
+  .card.total .porcentaje { color: #60a5fa; }
+  .card.total .detalle { color: #94a3b8; }
+  .error {
+    background: #fee2e2;
+    color: #991b1b;
+    padding: 10px;
+    border-radius: 8px;
+    font-size: 12px;
+    margin-bottom: 16px;
+    display: none;
+  }
+  .seccion-titulo {
+    font-size: 15px;
+    font-weight: 600;
+    margin: 30px 0 12px;
+    color: #334155;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  th, td {
+    text-align: left;
+    padding: 12px 16px;
+    font-size: 13px;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  th {
+    color: #64748b;
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    background: #f8fafc;
+  }
+  tr:last-child td { border-bottom: none; }
+  td.mes { font-weight: 600; }
+  td.porcentaje-mes { font-weight: 700; color: #2563eb; }
+  .filtros {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+  .filtros select {
+    padding: 8px 14px;
+    border-radius: 8px;
+    border: 1px solid #cbd5e1;
+    background: white;
+    font-size: 13px;
+    color: #334155;
+    cursor: pointer;
+  }
+  .filtros label {
+    font-size: 12px;
+    color: #64748b;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+</style>
+</head>
+<body>
+
+<h1>Tasa de Conversión: Conductor Registrado → Activado</h1>
+<div class="subtitle" id="subtitle">Cargando...</div>
+<div class="error" id="errorBox"></div>
+<div class="grid" id="grid"></div>
+
+<div class="seccion-titulo">🚗🏍️ Por tipo de vehículo</div>
+<div class="grid" id="gridVehiculo"></div>
+
+<div class="seccion-titulo">📅 Detalle mensual</div>
+<div class="filtros">
+  <label>Mes
+    <select id="filtroMes"><option value="todos">Todos</option></select>
+  </label>
+  <label>Ciudad
+    <select id="filtroCiudad">
+      <option value="todos">Todas</option>
+      <option value="Cali">Cali</option>
+      <option value="Barranquilla">Barranquilla</option>
+    </select>
+  </label>
+  <label>Vehículo
+    <select id="filtroVehiculo">
+      <option value="todos">Todos</option>
+      <option value="Carro">Carro</option>
+      <option value="Moto">Moto</option>
+      <option value="Sin dato">Sin dato</option>
+    </select>
+  </label>
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Mes</th>
+      <th>Ciudad</th>
+      <th>Vehículo</th>
+      <th>Registrados</th>
+      <th>Activados</th>
+      <th>% Conversión</th>
+    </tr>
+  </thead>
+  <tbody id="tablaMensual">
+    <tr><td colspan="6" style="color:#94a3b8;">Cargando...</td></tr>
+  </tbody>
+</table>
+
+<script>
+const SUPABASE_URL = 'https://hzrdikgiftdtprhducdq.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_lFfGaZGZgtwi6JvNPsdAqg_qhe7nhwp'; // clave publicable, segura para exponer en el navegador
+const REFRESH_MS = 60000; // se actualiza cada 60 segundos
+
+async function cargarDatos() {
+  const errorBox = document.getElementById('errorBox');
+  try {
+    const res = await fetch(SUPABASE_URL + '/rest/v1/conversion_stats?select=*', {
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: 'Bearer ' + SUPABASE_KEY
+      }
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status + ': ' + await res.text());
+    const filas = await res.json();
+
+    renderizar(filas);
+    document.getElementById('subtitle').textContent = 'Actualizado: ' + new Date().toLocaleTimeString('es-CO');
+    errorBox.style.display = 'none';
+  } catch (err) {
+    errorBox.style.display = 'block';
+    errorBox.textContent = 'Error: ' + err.message;
+  }
+}
+
+function renderizar(filas) {
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '';
+
+  let totalEnviados = 0;
+  let totalActivados = 0;
+
+  for (const fila of filas) {
+    totalEnviados += fila.total_enviados_a_ghl;
+    totalActivados += fila.total_activados;
+
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `
+      <div class="ciudad">📍 ${fila.city}</div>
+      <div class="porcentaje">${fila.tasa_conversion_porcentaje}%</div>
+      <div class="barra-bg"><div class="barra-fill" style="width:${fila.tasa_conversion_porcentaje}%"></div></div>
+      <div class="detalle">${fila.total_activados} activados de ${fila.total_enviados_a_ghl} registrados</div>
+    `;
+    grid.appendChild(card);
+  }
+
+  const tasaTotal = totalEnviados > 0 ? ((totalActivados / totalEnviados) * 100).toFixed(2) : 0;
+  const cardTotal = document.createElement('div');
+  cardTotal.className = 'card total';
+  cardTotal.innerHTML = `
+    <div class="ciudad">🌎 TOTAL GENERAL</div>
+    <div class="porcentaje">${tasaTotal}%</div>
+    <div class="barra-bg"><div class="barra-fill" style="width:${tasaTotal}%"></div></div>
+    <div class="detalle">${totalActivados} activados de ${totalEnviados} registrados</div>
+  `;
+  grid.appendChild(cardTotal);
+}
+
+async function cargarDatosVehiculo() {
+  try {
+    const res = await fetch(SUPABASE_URL + '/rest/v1/conversion_stats_vehiculo?select=*', {
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: 'Bearer ' + SUPABASE_KEY
+      }
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status + ': ' + await res.text());
+    const filas = await res.json();
+
+    const grid = document.getElementById('gridVehiculo');
+    grid.innerHTML = '';
+
+    const iconos = { 'Moto': '🏍️', 'Carro': '🚗', 'Sin dato': '❓' };
+
+    for (const fila of filas) {
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.innerHTML = `
+        <div class="ciudad">${iconos[fila.tipo_vehiculo] || '🚘'} ${fila.tipo_vehiculo}</div>
+        <div class="porcentaje">${fila.tasa_conversion_porcentaje}%</div>
+        <div class="barra-bg"><div class="barra-fill" style="width:${fila.tasa_conversion_porcentaje}%"></div></div>
+        <div class="detalle">${fila.total_activados} activados de ${fila.total_enviados_a_ghl} registrados</div>
+      `;
+      grid.appendChild(card);
+    }
+  } catch (err) {
+    const grid = document.getElementById('gridVehiculo');
+    grid.innerHTML = '<div style="color:#991b1b; font-size:13px;">Error: ' + err.message + '</div>';
+  }
+}
+
+const nombresMes = {
+  '01':'Enero','02':'Febrero','03':'Marzo','04':'Abril','05':'Mayo','06':'Junio',
+  '07':'Julio','08':'Agosto','09':'Septiembre','10':'Octubre','11':'Noviembre','12':'Diciembre'
+};
+
+let datosMensualesCompletos = []; // guarda TODO (mes+ciudad+vehiculo), se filtra en el navegador
+
+async function cargarDatosMensuales() {
+  const tbody = document.getElementById('tablaMensual');
+  try {
+    const res = await fetch(SUPABASE_URL + '/rest/v1/conversion_stats_mensual_vehiculo?select=*', {
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: 'Bearer ' + SUPABASE_KEY
+      }
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status + ': ' + await res.text());
+    datosMensualesCompletos = await res.json();
+
+    // Poblar el selector de meses con los meses que realmente existen (mas reciente primero)
+    const selectMes = document.getElementById('filtroMes');
+    const mesesUnicos = [...new Set(datosMensualesCompletos.map((f) => f.mes))].sort().reverse();
+    selectMes.innerHTML = '<option value="todos">Todos los meses</option>';
+    for (const mes of mesesUnicos) {
+      const [anio, mesNum] = mes.split('-');
+      const opt = document.createElement('option');
+      opt.value = mes;
+      opt.textContent = nombresMes[mesNum] + ' ' + anio;
+      selectMes.appendChild(opt);
+    }
+    selectMes.value = 'todos'; // siempre arranca mostrando todo
+
+    renderizarTablaMensual();
+  } catch (err) {
+    tbody.innerHTML = '<tr><td colspan="6" style="color:#991b1b;">Error: ' + err.message + '</td></tr>';
+  }
+}
+
+function renderizarTablaMensual() {
+  const tbody = document.getElementById('tablaMensual');
+  const mesElegido = document.getElementById('filtroMes').value;
+  const ciudadElegida = document.getElementById('filtroCiudad').value;
+  const vehiculoElegido = document.getElementById('filtroVehiculo').value;
+
+  const iconos = { 'Moto': '🏍️', 'Carro': '🚗', 'Sin dato': '❓' };
+
+  // Solo filtra (esconde filas que no matchean); NUNCA suma/agrupa,
+  // asi siempre se ve el detalle completo por ciudad y vehiculo.
+  const filtrados = datosMensualesCompletos.filter((f) =>
+    (ciudadElegida === 'todos' || f.city === ciudadElegida) &&
+    (vehiculoElegido === 'todos' || f.tipo_vehiculo === vehiculoElegido) &&
+    (mesElegido === 'todos' || f.mes === mesElegido)
+  ).sort((a, b) => (a.mes < b.mes ? 1 : a.mes > b.mes ? -1 : (a.city > b.city ? 1 : -1)));
+
+  tbody.innerHTML = '';
+
+  if (filtrados.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" style="color:#94a3b8;">Sin datos para este filtro</td></tr>';
+    return;
+  }
+
+  for (const fila of filtrados) {
+    const [anio, mesNum] = fila.mes.split('-');
+    const nombreLegible = nombresMes[mesNum] + ' ' + anio;
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="mes">${nombreLegible}</td>
+      <td>📍 ${fila.city}</td>
+      <td>${iconos[fila.tipo_vehiculo] || '🚘'} ${fila.tipo_vehiculo}</td>
+      <td>${fila.total_registrados}</td>
+      <td>${fila.total_activados}</td>
+      <td class="porcentaje-mes">${fila.tasa_conversion_porcentaje}%</td>
+    `;
+    tbody.appendChild(tr);
+  }
+}
+
+document.getElementById('filtroMes').addEventListener('change', renderizarTablaMensual);
+document.getElementById('filtroCiudad').addEventListener('change', renderizarTablaMensual);
+document.getElementById('filtroVehiculo').addEventListener('change', renderizarTablaMensual);
+
+cargarDatos();
+cargarDatosVehiculo();
+cargarDatosMensuales();
+setInterval(cargarDatos, REFRESH_MS);
+setInterval(cargarDatosVehiculo, REFRESH_MS);
+setInterval(cargarDatosMensuales, REFRESH_MS);
+</script>
+
+</body>
+</html>

@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Tasa de Conversión - Yango</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #f8fafc;
+    padding: 20px;
+    color: #1e293b;
+  }
+  h1 { font-size: 20px; margin-bottom: 4px; }
+  .subtitle { color: #64748b; font-size: 12px; margin-bottom: 20px; }
+  .error {
+    background: #fee2e2;
+    color: #991b1b;
+    padding: 10px;
+    border-radius: 8px;
+    font-size: 12px;
+    margin-bottom: 16px;
+    display: none;
+  }
+
+  /* Barra de filtros, fija arriba de todo */
+  .filtros {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 24px;
+    align-items: flex-end;
+  }
+  .filtros label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #475569;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .filtros select {
+    padding: 9px 14px;
+    border-radius: 8px;
+    border: 1px solid #cbd5e1;
+    background: #f8fafc;
+    font-size: 13px;
+    color: #1e293b;
+    cursor: pointer;
+    min-width: 160px;
+  }
+  .filtros select:focus { outline: 2px solid #2563eb; border-color: #2563eb; }
+  .btn-limpiar {
+    padding: 9px 16px;
+    border-radius: 8px;
+    border: 1px solid #cbd5e1;
+    background: white;
+    color: #475569;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .btn-limpiar:hover { background: #f1f5f9; }
+
+  .seccion-titulo {
+    font-size: 15px;
+    font-weight: 600;
+    margin: 30px 0 12px;
+    color: #334155;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+  }
+  .card {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 20px;
+  }
+  .card .titulo-card {
+    font-size: 14px;
+    font-weight: 600;
+    color: #475569;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card .porcentaje {
+    font-size: 36px;
+    font-weight: 700;
+    color: #2563eb;
+    margin-bottom: 8px;
+  }
+  .card .detalle { font-size: 13px; color: #64748b; }
+  .barra-bg {
+    background: #e2e8f0;
+    border-radius: 6px;
+    height: 8px;
+    overflow: hidden;
+    margin: 10px 0;
+  }
+  .barra-fill {
+    background: linear-gradient(90deg, #2563eb, #60a5fa);
+    height: 100%;
+    transition: width 0.5s ease;
+  }
+  .card.total { background: #1e293b; color: white; }
+  .card.total .titulo-card { color: #cbd5e1; }
+  .card.total .porcentaje { color: #60a5fa; }
+  .card.total .detalle { color: #94a3b8; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  th, td {
+    text-align: left;
+    padding: 12px 16px;
+    font-size: 13px;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  th {
+    color: #64748b;
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    background: #f8fafc;
+  }
+  tr:last-child td { border-bottom: none; }
+  td.mes { font-weight: 600; }
+  td.porcentaje-mes { font-weight: 700; color: #2563eb; }
+</style>
+</head>
+<body>
+
+<h1>Tasa de Conversión: Conductor Registrado → Activado</h1>
+<div class="subtitle" id="subtitle">Cargando...</div>
+<div class="error" id="errorBox"></div>
+
+<div class="filtros">
+  <label>Mes
+    <select id="filtroMes"><option value="todos">Todos</option></select>
+  </label>
+  <label>Ciudad
+    <select id="filtroCiudad">
+      <option value="todos">Todas</option>
+      <option value="Cali">Cali</option>
+      <option value="Barranquilla">Barranquilla</option>
+    </select>
+  </label>
+  <label>Vehículo
+    <select id="filtroVehiculo">
+      <option value="todos">Todos</option>
+      <option value="Carro">Carro</option>
+      <option value="Moto">Moto</option>
+      <option value="Sin dato">Sin dato</option>
+    </select>
+  </label>
+  <button class="btn-limpiar" id="btnLimpiar">Limpiar filtros</button>
+</div>
+
+<div class="seccion-titulo">📍 Por ciudad</div>
+<div class="grid" id="gridCiudad"></div>
+
+<div class="seccion-titulo">🚗🏍️ Por tipo de vehículo</div>
+<div class="grid" id="gridVehiculo"></div>
+
+<div class="seccion-titulo">📅 Detalle mensual</div>
+<table>
+  <thead>
+    <tr>
+      <th>Mes</th>
+      <th>Ciudad</th>
+      <th>Vehículo</th>
+      <th>Registrados</th>
+      <th>Activados</th>
+      <th>% Conversión</th>
+    </tr>
+  </thead>
+  <tbody id="tablaMensual">
+    <tr><td colspan="6" style="color:#94a3b8;">Cargando...</td></tr>
+  </tbody>
+</table>
+
+<script>
+const SUPABASE_URL = 'https://hzrdikgiftdtprhducdq.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_lFfGaZGZgtwi6JvNPsdAqg_qhe7nhwp';
+const REFRESH_MS = 60000;
+
+const nombresMes = {
+  '01':'Enero','02':'Febrero','03':'Marzo','04':'Abril','05':'Mayo','06':'Junio',
+  '07':'Julio','08':'Agosto','09':'Septiembre','10':'Octubre','11':'Noviembre','12':'Diciembre'
+};
+const iconosVehiculo = { 'Moto': '🏍️', 'Carro': '🚗', 'Sin dato': '❓' };
+
+let datosCompletos = []; // fuente unica de verdad: mes + city + tipo_vehiculo + registrados + activados
+
+async function cargarDatos() {
+  const errorBox = document.getElementById('errorBox');
+  try {
+    const res = await fetch(SUPABASE_URL + '/rest/v1/conversion_stats_mensual_vehiculo?select=*', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status + ': ' + await res.text());
+    datosCompletos = await res.json();
+
+    poblarSelectorMeses();
+    renderizarTodo();
+
+    document.getElementById('subtitle').textContent = 'Actualizado: ' + new Date().toLocaleTimeString('es-CO');
+    errorBox.style.display = 'none';
+  } catch (err) {
+    errorBox.style.display = 'block';
+    errorBox.textContent = 'Error: ' + err.message;
+  }
+}
+
+function poblarSelectorMeses() {
+  const selectMes = document.getElementById('filtroMes');
+  if (selectMes.dataset.poblado === 'si') return; // solo la primera vez, para no resetear la seleccion del usuario
+  const mesesUnicos = [...new Set(datosCompletos.map((f) => f.mes))].sort().reverse();
+  selectMes.innerHTML = '<option value="todos">Todos</option>';
+  for (const mes of mesesUnicos) {
+    const [anio, mesNum] = mes.split('-');
+    const opt = document.createElement('option');
+    opt.value = mes;
+    opt.textContent = nombresMes[mesNum] + ' ' + anio;
+    selectMes.appendChild(opt);
+  }
+  selectMes.dataset.poblado = 'si';
+}
+
+function obtenerDatosFiltrados() {
+  const mes = document.getElementById('filtroMes').value;
+  const ciudad = document.getElementById('filtroCiudad').value;
+  const vehiculo = document.getElementById('filtroVehiculo').value;
+  return datosCompletos.filter((f) =>
+    (mes === 'todos' || f.mes === mes) &&
+    (ciudad === 'todos' || f.city === ciudad) &&
+    (vehiculo === 'todos' || f.tipo_vehiculo === vehiculo)
+  );
+}
+
+function sumar(filas) {
+  return filas.reduce((acc, f) => {
+    acc.registrados += f.total_registrados;
+    acc.activados += f.total_activados;
+    return acc;
+  }, { registrados: 0, activados: 0 });
+}
+
+function pct(registrados, activados) {
+  return registrados > 0 ? ((activados / registrados) * 100).toFixed(2) : '0.00';
+}
+
+function renderizarTodo() {
+  const filtrados = obtenerDatosFiltrados();
+
+  // ===== Tarjetas por ciudad =====
+  const gridCiudad = document.getElementById('gridCiudad');
+  gridCiudad.innerHTML = '';
+  const ciudades = [...new Set(filtrados.map((f) => f.city))].sort();
+  for (const ciudad of ciudades) {
+    const { registrados, activados } = sumar(filtrados.filter((f) => f.city === ciudad));
+    const tasa = pct(registrados, activados);
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `
+      <div class="titulo-card">📍 ${ciudad}</div>
+      <div class="porcentaje">${tasa}%</div>
+      <div class="barra-bg"><div class="barra-fill" style="width:${tasa}%"></div></div>
+      <div class="detalle">${activados} activados de ${registrados} registrados</div>
+    `;
+    gridCiudad.appendChild(card);
+  }
+  const totalGeneral = sumar(filtrados);
+  const tasaGeneral = pct(totalGeneral.registrados, totalGeneral.activados);
+  const cardTotal = document.createElement('div');
+  cardTotal.className = 'card total';
+  cardTotal.innerHTML = `
+    <div class="titulo-card">🌎 TOTAL GENERAL</div>
+    <div class="porcentaje">${tasaGeneral}%</div>
+    <div class="barra-bg"><div class="barra-fill" style="width:${tasaGeneral}%"></div></div>
+    <div class="detalle">${totalGeneral.activados} activados de ${totalGeneral.registrados} registrados</div>
+  `;
+  gridCiudad.appendChild(cardTotal);
+
+  // ===== Tarjetas por vehiculo =====
+  const gridVehiculo = document.getElementById('gridVehiculo');
+  gridVehiculo.innerHTML = '';
+  const vehiculos = [...new Set(filtrados.map((f) => f.tipo_vehiculo))].sort();
+  for (const vehiculo of vehiculos) {
+    const { registrados, activados } = sumar(filtrados.filter((f) => f.tipo_vehiculo === vehiculo));
+    const tasa = pct(registrados, activados);
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `
+      <div class="titulo-card">${iconosVehiculo[vehiculo] || '🚘'} ${vehiculo}</div>
+      <div class="porcentaje">${tasa}%</div>
+      <div class="barra-bg"><div class="barra-fill" style="width:${tasa}%"></div></div>
+      <div class="detalle">${activados} activados de ${registrados} registrados</div>
+    `;
+    gridVehiculo.appendChild(card);
+  }
+  if (vehiculos.length === 0) {
+    gridVehiculo.innerHTML = '<div style="color:#94a3b8; font-size:13px;">Sin datos para este filtro</div>';
+  }
+
+  // ===== Tabla detalle =====
+  const tbody = document.getElementById('tablaMensual');
+  tbody.innerHTML = '';
+  const filasOrdenadas = [...filtrados].sort((a, b) =>
+    a.mes < b.mes ? 1 : a.mes > b.mes ? -1 : (a.city > b.city ? 1 : -1)
+  );
+  if (filasOrdenadas.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" style="color:#94a3b8;">Sin datos para este filtro</td></tr>';
+    return;
+  }
+  for (const fila of filasOrdenadas) {
+    const [anio, mesNum] = fila.mes.split('-');
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="mes">${nombresMes[mesNum]} ${anio}</td>
+      <td>📍 ${fila.city}</td>
+      <td>${iconosVehiculo[fila.tipo_vehiculo] || '🚘'} ${fila.tipo_vehiculo}</td>
+      <td>${fila.total_registrados}</td>
+      <td>${fila.total_activados}</td>
+      <td class="porcentaje-mes">${fila.tasa_conversion_porcentaje}%</td>
+    `;
+    tbody.appendChild(tr);
+  }
+}
+
+document.getElementById('filtroMes').addEventListener('change', renderizarTodo);
+document.getElementById('filtroCiudad').addEventListener('change', renderizarTodo);
+document.getElementById('filtroVehiculo').addEventListener('change', renderizarTodo);
+document.getElementById('btnLimpiar').addEventListener('click', () => {
+  document.getElementById('filtroMes').value = 'todos';
+  document.getElementById('filtroCiudad').value = 'todos';
+  document.getElementById('filtroVehiculo').value = 'todos';
+  renderizarTodo();
+});
+
+cargarDatos();
+setInterval(cargarDatos, REFRESH_MS);
+</script>
+
+</body>
+</html>
